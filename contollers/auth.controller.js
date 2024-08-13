@@ -61,9 +61,9 @@ const authController = {
 			}
 
 			const newUser =
-				await sql`INSERT INTO "users" (username, email, password, subscription) 
-						  VALUES (${username}, ${email}, ${hashedPassword}, 'basic') 
-						  RETURNING id, username, email, subscription`;
+				await sql`INSERT INTO "users" (username, email, password, subscription,  subscription_end_date) 
+						  VALUES (${username}, ${email}, ${hashedPassword}, 'basic', NULL) 
+						  RETURNING id, username, email, subscription, subscription_end_date`
 
 			const user = newUser[0];
 
@@ -77,6 +77,7 @@ const authController = {
 				username: user.username,
 				email: user.email,
 				subscription: user.subscription,
+				subscription_end_date: user.subscription_end_date,
 				token,
 				message: "Регистрация успешна",
 			});
