@@ -52,7 +52,7 @@ const userController = {
 			}
 		
 			const result = await sql`
-			  SELECT id, username, email, subscription 
+			  SELECT id, username, email, subscription, subscription_end_date
 			  FROM users 
 			  WHERE id = ${id}`;
 		
