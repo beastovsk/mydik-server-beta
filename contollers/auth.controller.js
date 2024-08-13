@@ -17,7 +17,6 @@ const authController = {
 	login: async (req, res) => {
 		try {
 			const { email, password } = req.body;
-			console.log(true);
 			const userList =
 				await sql`SELECT * FROM "users" WHERE email = ${email}`;
 
@@ -28,13 +27,6 @@ const authController = {
 			}
 
 			const user = userList[0];
-
-			if (!user.is_confirmed) {
-				return res.status(200).json({
-					message:
-						"Аккаунт не подтвержден. Проверьте вашу почту для подтверждения регистрации",
-				});
-			}
 
 			const checkPass = await bcrypt.compare(password, user.password);
 			if (!checkPass) {
@@ -56,64 +48,40 @@ const authController = {
 	},
 	register: async (req, res) => {
 		try {
-			const { email, password } = req.body;
-			const existingUser =
-				await sql`SELECT * FROM "users" WHERE email = ${email}`;
+			const { username, email, password } = req.body;
 
-			if (existingUser.length > 0) {
-				const user = existingUser[0];
-				if (!user.is_confirmed) {
-					return res
-						.status(200)
-						.json({ message: "Подтвердите почту" });
-				}
+			const hashedPassword = await bcrypt.hash(password, 10);
+
+			const existingUserList =
+				await sql`SELECT * FROM "users" WHERE email = ${email}`;
+			if (existingUserList.length > 0) {
 				return res
 					.status(200)
-					.json({ message: "Этот пользователь уже зарегистрирован" });
+					.json({ message: "Пользователь с таким email уже существует" });
 			}
 
-			const hash = await bcrypt.hash(password, 10);
-			const confirmToken = v4().split("-")[0];
+			const newUser =
+				await sql`INSERT INTO "users" (username, email, password, subscription) 
+						  VALUES (${username}, ${email}, ${hashedPassword}, 'basic') 
+						  RETURNING id, username, email, subscription`;
 
-			await sql`
-				INSERT INTO "users" (email, password, is_confirmed, confirm_token)
-				VALUES (${email}, ${hash}, ${0}, ${confirmToken})
-			`;
+			const user = newUser[0];
 
-			const mailBody = `
-				<div>
-					<h1 style='color: #111'>Startup Idea</h1>
-					<h2>
-						Ваш <i style='color: #111'>код</i> для подтверждения почты:</h2>
-					<br/> 
-					<h3>
-						<b style='color: #ccc' class='token'>${confirmToken}</b>
-					</h3>
-				</div>
-			`;
+			const token = generateToken({
+				id: user.id,
+				email: user.email,
+			});
 
-			const mailOptions = {
-				from: "Webi",
-				to: email,
-				html: mailBody,
-				subject: "Подтверждение почты",
-			};
-
-			transporter.sendMail(mailOptions, (error, info) => {
-				if (error) {
-					console.error("Ошибка отправки электронной почты:", error);
-					res.status(500).json({
-						error: "Ошибка отправки электронной почты",
-					});
-				} else {
-					res.json({
-						message:
-							"Подтверждение регистрации отправлено на вашу почту",
-					});
-				}
+			res.status(201).json({
+				id: user.id,
+				username: user.username,
+				email: user.email,
+				subscription: user.subscription,
+				token,
+				message: "Регистрация успешна",
 			});
 		} catch (error) {
-			console.error("Ошибка регистрации:", error);
+			console.log(error);
 			res.status(500).json({ error: "Ошибка регистрации" });
 		}
 	},
